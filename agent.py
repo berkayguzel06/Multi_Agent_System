@@ -107,8 +107,9 @@ management_agent = CodeAgent(
 )
 
 prompt = """
-    Can you write a pyhton script that can help me to find the best stock to invest in?
-    Then save the python file in the current directory.
+    1. Open https://huggingface.co/models and find a model that can be used for image generation.
+    2. Click the model to see descriptions and details.
+    3. Write a summary of the model and its capabilities.
 """
 
 code_agent.run(prompt)
