@@ -1,8 +1,6 @@
-from smolagents import CodeAgent, tool, LiteLLMModel, DuckDuckGoSearchTool
-import pandas as pd
-import matplotlib.pyplot as plt
+from smolagents import CodeAgent, LiteLLMModel, DuckDuckGoSearchTool
+import agent_tools as at
 import os
-import json
 import dotenv
 
 dotenv.load_dotenv()
@@ -15,101 +13,55 @@ if GEMINI_API_KEY is not None:
 else:
     raise EnvironmentError("GEMINI_API_KEY environment variable is not set.")
 
-# Get Promt json file "prompt.json"
-prompts = json.load(open(PROMPT_JSON_FILE))
+visit_webpage = at.visit_webpage
+create_file_if_not_exists = at.create_file_if_not_exists
+create_folder_if_not_exists = at.create_folder_if_not_exists
+is_prime = at.is_prime
+sql_engine = at.sql_engine
+get_database_column_info = at.get_database_column_info
+write_findings_to_text_file = at.write_findings_to_text_file
+
 
 model = LiteLLMModel(model_id="gemini/gemini-2.0-flash")
 
-@tool
-def create_file_if_not_exists(path: str) -> None:
-    """
-    Create file if not exists
-    Args:
-        path: Path to file
-    """
-    if not os.path.exists(path):
-        open(path, 'w').close()
-
-@tool
-def create_folder_if_not_exists(path: str) -> None:
-    """
-    Create folder if not exists
-    Args:
-        path: Path to folder
-    """
-    if not os.path.exists(path):
-        os.makedirs(path)
-
-@tool
-def load_csv_from_path(path: str) -> pd.DataFrame:
-    """
-    Look at the path and load csv data from path
-    Args:
-        path: Path to csv file
-    """
-    return pd.read_csv(path)
-
-@tool
-def add_matplotlib_plot_to_file(plot: plt.Figure, path: str) -> None:
-    """
-    Add matplotlib plot to file
-    Args:
-        plot: Matplotlib plot
-        path: Path to save plot
-    """
-    plot.savefig(path)
-
-@tool
-def write_findings_to_text_file(findings: str, path: str) -> None:
-    """
-    Write findings to text file
-    Args:
-        findings: Findings
-        path: Path to save findings
-    """
-    with open(path, 'w') as file:
-        file.write(findings)
-
 web_agent = CodeAgent(
-    tools=[DuckDuckGoSearchTool()],
+    tools=[DuckDuckGoSearchTool(), visit_webpage],
     model=model,
-    name=prompts['prompts'][2]['type'],
-    description=prompts['prompts'][2]['description'],
-    prompt_templates={
-        "system_prompt": prompts['prompts'][2]['prompt'],
-    }
+    name="Web Agent",
+    description="This agent can search the web and provide the results.",
 )
 
 code_agent = CodeAgent(
     tools=[write_findings_to_text_file,
-           create_file_if_not_exists, create_folder_if_not_exists],
+           create_file_if_not_exists, create_folder_if_not_exists, is_prime],
     additional_authorized_imports=['pandas','statsmodels','sklearn','numpy','json',
                                    'matplotlib', 'os',"selenium", "requests", "markdownify",
                                     "selenium.webdriver.common.by", "selenium.webdriver.common.keys", "yfinance", "subprocess",
                                     "bs4"],
-    name=prompts['prompts'][1]['type'],
-    description=prompts['prompts'][1]['description'],
+    name="Code Agent",
+    description="This agent can run code snippets and provide the output.",
     model=model,
-    prompt_templates={
-        "system_prompt": prompts['prompts'][1]['prompt'],
-    }
 )
 
-management_agent = CodeAgent(
-    tools=[],
+database_agent = CodeAgent(
+    tools=[sql_engine, get_database_column_info],
     model=model,
-    managed_agents=[web_agent, code_agent],
-    name=prompts['prompts'][3]["type"],
-    description=prompts['prompts'][3]["description"],
-    prompt_templates={
-        "system_prompt": prompts['prompts'][3]['prompt'],
-    }
+    name="Database Agent",
+    description="This agent can query a database and provide the results.",
 )
 
-prompt = """
-    1. Open https://huggingface.co/models and find a model that can be used for image generation.
-    2. Click the model to see descriptions and details.
-    3. Write a summary of the model and its capabilities.
+code_prompt = """
+    Check if the number 17 is a prime number and provide the result in cheerful way.
 """
 
-code_agent.run(prompt)
+search_prompt = """
+    Search for the latest news on artificial intelligence.
+"""
+
+database_prompt = """
+    Get the column information of the table 'users' from db 'WhatsappDB'.
+"""
+
+code_agent.run(code_prompt)
+web_agent.run(search_prompt)
+database_agent.run(database_prompt)
